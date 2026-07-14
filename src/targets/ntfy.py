@@ -1,4 +1,4 @@
-"""Thin async client for publishing plain text to an ntfy topic.
+"""Target that publishes to an ntfy topic.
 
 ntfy (https://ntfy.sh) treats the raw request body as the notification
 message, so we POST the text as-is. On success ntfy responds with a JSON
@@ -11,18 +11,16 @@ from __future__ import annotations
 import httpx
 
 
-class NtfyClient:
-    def __init__(self, server: str, topic: str, token: str | None = None):
-        self._url = f"{server.rstrip('/')}/{topic}"
+class NtfyTarget:
+    """POST raw text to an ntfy topic URL (e.g. ``https://ntfy.sh/mytopic``)."""
+
+    def __init__(self, url: str, token: str | None = None, timeout: float = 10):
+        self._url = url.rstrip("/")
         self._headers = {"Authorization": f"Bearer {token}"} if token else {}
+        self._timeout = timeout
 
     async def publish(self, text: str) -> dict:
-        """Publish ``text`` to the topic. Returns ntfy's JSON response.
-
-        Raises ``httpx.HTTPStatusError`` for non-2xx responses so callers can
-        report failure back to the user.
-        """
-        async with httpx.AsyncClient(timeout=10) as client:
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
             resp = await client.post(
                 self._url,
                 content=text.encode("utf-8"),
@@ -32,5 +30,5 @@ class NtfyClient:
             try:
                 return resp.json()  # {"id": "...", "time": ..., "topic": "..."}
             except ValueError:
-                # Non-ntfy endpoint that doesn't return JSON — still a success.
+                # Endpoint accepted us but returned no JSON — still a success.
                 return {"id": "?"}

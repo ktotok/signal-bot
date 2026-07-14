@@ -1,8 +1,10 @@
-"""Catch-all Signal command that forwards any text message to ntfy.
+"""Catch-all Signal command that forwards any text message to the target.
 
 The command has no ``@triggered`` decorator, so signalbot runs ``handle`` for
 *every* dispatched message. We forward the text of normal messages and of
 Note-to-Self / linked-device messages, then reply in Signal with a status line.
+The destination is any object implementing ``targets.Target`` (ntfy by default,
+or any registered endpoint), so this handler is endpoint-agnostic.
 """
 
 from __future__ import annotations
@@ -22,12 +24,12 @@ FORWARDABLE = {MessageType.DATA_MESSAGE, MessageType.SYNC_MESSAGE}
 class ForwardCommand(Command):
     def __init__(
         self,
-        ntfy,
+        target,
         reply_on_success: bool = True,
         reply_prefix: str = "✅",
     ):
         super().__init__()
-        self._ntfy = ntfy
+        self._target = target
         self._reply = reply_on_success
         self._prefix = reply_prefix
 
@@ -48,8 +50,8 @@ class ForwardCommand(Command):
             return
 
         try:
-            result = await self._ntfy.publish(text)
-            status = f"{self._prefix} sent to ntfy (id {result.get('id', '?')})"
+            result = await self._target.publish(text)
+            status = f"{self._prefix} sent (id {result.get('id', '?')})"
         except Exception as e:  # noqa: BLE001 — report any failure to the user
             log.exception("ntfy publish failed")
             status = f"⚠️ failed to send: {e}"

@@ -12,17 +12,13 @@ import os
 from signalbot import Config, SignalBot, enable_console_logging
 
 from forward_command import ForwardCommand
-from ntfy_client import NtfyClient
+from targets import TargetBuilder
 
 
 def main() -> None:
     enable_console_logging(logging.INFO)
 
-    ntfy = NtfyClient(
-        server=os.environ.get("NTFY_SERVER", "https://ntfy.sh"),
-        topic=os.environ["NTFY_TOPIC"],
-        token=os.environ.get("NTFY_TOKEN"),
-    )
+    target = TargetBuilder.from_env().build()
 
     bot = SignalBot(
         Config(
@@ -33,12 +29,12 @@ def main() -> None:
 
     reply = os.environ.get("REPLY_ON_SUCCESS", "true").lower() == "true"
     bot.register(
-        ForwardCommand(ntfy, reply_on_success=reply),
+        ForwardCommand(target, reply_on_success=reply),
         contacts=True,
         groups=True,
     )
 
-    logging.getLogger(__name__).info("Signal → ntfy forwarder starting")
+    logging.getLogger(__name__).info("Signal → target forwarder starting")
     bot.start()
 
 
