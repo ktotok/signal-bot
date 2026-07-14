@@ -1,0 +1,2 @@
+signalbot>=0.25
+httpx>=0.27

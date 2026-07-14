@@ -1,0 +1,10 @@
+# Secrets and account credentials — must never be committed.
+.env
+signal-cli-config/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
