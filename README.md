@@ -1,15 +1,20 @@
-# Signal → ntfy text forwarder
+# Signal → text forwarder
 
 A tiny personal bot: type **any plain text** into Signal and it gets forwarded to
-a free [ntfy](https://ntfy.sh) topic that you can watch from anywhere. No message
-format required. The bot replies in Signal with a `✅ sent` confirmation so you
-know each message was accepted.
+an HTTP endpoint you choose that you can watch from anywhere. No message format
+required. The bot replies in Signal with a `✅ sent` confirmation so you know each
+message was accepted.
+
+The destination is **configurable**: point `TARGET_URL` at a free
+[ntfy](https://ntfy.sh) topic (the built-in client). The client is selected from
+config, and adding a new endpoint type is a one-line registration, not a change
+to the bot — see [Adding a new target type](#adding-a-new-target-type).
 
 ```
 Your phone (Signal · Note to Self)
         │  linked device (QR)
         ▼
-signal-cli-rest-api  ──►  Python bot  ──►  https://ntfy.sh/<your-topic>  ──►  ntfy app / web
+signal-cli-rest-api  ──►  Python bot  ──►  TARGET_URL (ntfy)  ──►  ntfy app / web
         ▲                     │
         └──── "✅ sent" ◄──────┘
 ```
@@ -37,14 +42,14 @@ sees these messages.
   effectively a credential to your Signal account. Keep it private, never commit
   it, restrict its permissions, and back it up securely. Deleting it de-links the
   bot (you'd re-link with a new QR).
-- **Never commit `.env`.** It contains your phone number, ntfy topic, and any
-  `NTFY_TOKEN`. It's in `.gitignore` — keep it there.
+- **Never commit `.env`.** It contains your phone number, target URL, and any
+  `TARGET_TOKEN`. It's in `.gitignore` — keep it there.
 - **Public ntfy topics are readable by anyone who guesses the name.** Use a long,
   random topic (e.g. `signal-fwd-9f3a7c21b8`); for anything sensitive, set
-  `NTFY_TOKEN` with a reserved or self-hosted topic instead of public `ntfy.sh`.
+  `TARGET_TOKEN` with a reserved or self-hosted endpoint instead of a public one.
 - **Forwarded text leaves Signal's encryption.** The moment the bot forwards a
-  message to ntfy it travels to and is cached by the ntfy server in the clear
-  (per that server's policy). Don't forward secrets you wouldn't post there.
+  message it travels to and is cached by the target server in the clear (per that
+  server's policy). Don't forward secrets you wouldn't post there.
 - **Revoking access:** unlink anytime from Signal → Settings → Linked devices →
   remove the `signal-forwarder` device; then stop the containers and delete
   `signal-cli-config/`.
@@ -85,8 +90,9 @@ cp .env.example .env
 Edit `.env`:
 
 - `PHONE_NUMBER` — your Signal account number (`+…`).
-- `NTFY_TOPIC` — a long, random topic name.
-- optional: `NTFY_SERVER`, `NTFY_TOKEN`, `REPLY_ON_SUCCESS`.
+- `TARGET_URL` — where to forward, e.g. `https://ntfy.sh/<your-random-topic>`
+  (or a base URL like `https://ntfy.sh` plus `TARGET_TOPIC`).
+- optional: `TARGET_TYPE`, `TARGET_TOPIC`, `TARGET_TOKEN`, `REPLY_ON_SUCCESS`.
 
 Subscribe to the topic so you can watch messages arrive: install the ntfy app
 (iOS/Android) and add your topic, or open `https://ntfy.sh/<your-topic>` in a
@@ -101,13 +107,13 @@ docker compose logs -f bot
 
 ## Usage
 
-Open **Note to Self** in Signal and send any text. It appears on your ntfy topic
-within a second, and the bot replies `✅ sent to ntfy (id …)`.
+Open **Note to Self** in Signal and send any text. It appears at your target
+within a second, and the bot replies `✅ sent (id …)`.
 
 ## Testing
 
-Unit tests run without any Signal service or network (they mock ntfy and the
-Signal context):
+Unit tests run without any Signal service or network (they mock the target and
+the Signal context):
 
 ```bash
 pip install -r requirements-dev.txt
@@ -126,13 +132,26 @@ curl -s "https://ntfy.sh/<your-topic>/json?poll=1"
 | Variable           | Required | Default            | Description                                            |
 | ------------------ | -------- | ------------------ | ------------------------------------------------------ |
 | `PHONE_NUMBER`     | yes      | —                  | Linked Signal account number, E.164 (`+…`).            |
-| `NTFY_TOPIC`       | yes      | —                  | ntfy topic to publish to. Use a random name.           |
-| `NTFY_SERVER`      | no       | `https://ntfy.sh`  | ntfy server base URL.                                  |
-| `NTFY_TOKEN`       | no       | —                  | Bearer token for a reserved/self-hosted topic.         |
+| `TARGET_URL`       | yes      | —                  | Endpoint URL. Full URL, or a base to combine with `TARGET_TOPIC`. |
+| `TARGET_TYPE`      | no       | `ntfy`             | Client to use. `ntfy` is built in; others via `register()`. |
+| `TARGET_TOPIC`     | no       | —                  | Path segment appended to `TARGET_URL` (e.g. an ntfy topic). |
+| `TARGET_TOKEN`     | no       | —                  | Bearer token sent as `Authorization` header.           |
 | `REPLY_ON_SUCCESS` | no       | `true`             | Reply in Signal after each forward.                    |
 | `SIGNAL_SERVICE`   | no*      | `signal-api:8080`  | signal-cli-rest-api address (set by compose).          |
 
 \* Required only outside docker-compose.
+
+### Adding a new target type
+
+Implement a client with an `async def publish(self, text) -> dict` method (see
+`src/targets/base.py`), then register it:
+
+```python
+from targets import register
+register("mytype", lambda url, token: MyClient(url, token=token))
+```
+
+Set `TARGET_TYPE=mytype` and it's selected at startup — no other code changes.
 
 ## Project layout
 
@@ -143,8 +162,13 @@ curl -s "https://ntfy.sh/<your-topic>/json?poll=1"
 ├── requirements*.txt      # runtime / dev deps
 ├── .env.example           # copy to .env
 ├── src/
-│   ├── ntfy_client.py     # async POST to ntfy
+│   ├── targets/           # pluggable publish clients
+│   │   ├── base.py        #   Target protocol (the contract)
+│   │   ├── ntfy.py        #   ntfy client (built in)
+│   │   └── builder.py     #   TargetBuilder + registry (config → client)
 │   ├── forward_command.py # catch-all: forward text + confirm
 │   └── bot.py             # wiring + start
-└── tests/test_forwarder.py
+└── tests/
+    ├── test_forwarder.py  # ForwardCommand behavior
+    └── test_targets.py    # builder / client selection
 ```
