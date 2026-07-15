@@ -8,3 +8,6 @@ __pycache__/
 .pytest_cache/
 .venv/
 venv/
+
+# Local Claude Code settings (per-machine, do not commit)
+.claude/settings.local.json

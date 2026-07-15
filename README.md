@@ -90,8 +90,9 @@ cp .env.example .env
 Edit `.env`:
 
 - `PHONE_NUMBER` — your Signal account number (`+…`).
-- `TARGET_URL` — where to forward, e.g. `https://ntfy.sh/<your-random-topic>`.
-- optional: `TARGET_TYPE`, `TARGET_TOKEN`, `REPLY_ON_SUCCESS`.
+- `TARGET_URL` — where to forward, e.g. `https://ntfy.sh/<your-random-topic>`
+  (or a base URL like `https://ntfy.sh` plus `TARGET_TOPIC`).
+- optional: `TARGET_TYPE`, `TARGET_TOPIC`, `TARGET_TOKEN`, `REPLY_ON_SUCCESS`.
 
 Subscribe to the topic so you can watch messages arrive: install the ntfy app
 (iOS/Android) and add your topic, or open `https://ntfy.sh/<your-topic>` in a
@@ -131,15 +132,14 @@ curl -s "https://ntfy.sh/<your-topic>/json?poll=1"
 | Variable           | Required | Default            | Description                                            |
 | ------------------ | -------- | ------------------ | ------------------------------------------------------ |
 | `PHONE_NUMBER`     | yes      | —                  | Linked Signal account number, E.164 (`+…`).            |
-| `TARGET_URL`       | yes†     | —                  | Full endpoint URL to forward text to.                  |
+| `TARGET_URL`       | yes      | —                  | Endpoint URL. Full URL, or a base to combine with `TARGET_TOPIC`. |
 | `TARGET_TYPE`      | no       | `ntfy`             | Client to use. `ntfy` is built in; others via `register()`. |
+| `TARGET_TOPIC`     | no       | —                  | Path segment appended to `TARGET_URL` (e.g. an ntfy topic). |
 | `TARGET_TOKEN`     | no       | —                  | Bearer token sent as `Authorization` header.           |
 | `REPLY_ON_SUCCESS` | no       | `true`             | Reply in Signal after each forward.                    |
 | `SIGNAL_SERVICE`   | no*      | `signal-api:8080`  | signal-cli-rest-api address (set by compose).          |
 
 \* Required only outside docker-compose.
-† If `TARGET_URL` is unset, the legacy `NTFY_TOPIC` (+ optional `NTFY_SERVER`,
-`NTFY_TOKEN`) are used to build an ntfy URL, so existing setups keep working.
 
 ### Adding a new target type
 

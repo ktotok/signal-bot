@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A personal bot that forwards **any plain text** a user types into Signal to a configurable HTTP target (a free [ntfy](https://ntfy.sh) topic by default), then replies in Signal with a `✅ sent (id …)` confirmation. Python + `signalbot`, packaged as two Docker services.
 
-**Configurable target.** The destination is chosen at startup by `TargetBuilder.from_env().build()` (`src/targets/builder.py`) from `TARGET_URL` / `TARGET_TYPE` (default `ntfy`). The concrete client (`NtfyTarget`) implements the `Target` protocol in `src/targets/base.py` and self-registers in a name→factory registry, so a new endpoint type is a `register(...)` call, not a change to the bot wiring. Legacy `NTFY_TOPIC`/`NTFY_SERVER`/`NTFY_TOKEN` are still honored when `TARGET_URL` is unset.
+**Configurable target.** The destination is chosen at startup by `TargetBuilder.from_env().build()` (`src/targets/builder.py`) from `TARGET_URL` / `TARGET_TYPE` (default `ntfy`). The concrete client (`NtfyTarget`) implements the `Target` protocol in `src/targets/base.py` and self-registers in a name→factory registry, so a new endpoint type is a `register(...)` call, not a change to the bot wiring. `TARGET_URL` is the base endpoint; an optional `TARGET_TOPIC` is appended to it as a path segment (e.g. an ntfy topic).
 
 ## Commands
 

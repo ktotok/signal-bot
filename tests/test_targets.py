@@ -27,20 +27,29 @@ def test_token_is_applied():
     assert t._headers == {"Authorization": "Bearer secret"}
 
 
-def test_legacy_ntfy_env_still_works():
+def test_topic_appended_to_url():
     t = TargetBuilder.from_env(
-        {"NTFY_TOPIC": "legacy-topic", "NTFY_TOKEN": "tk_1"}
+        {"TARGET_URL": "https://ntfy.sh", "TARGET_TOPIC": "my-topic"}
     ).build()
-    assert isinstance(t, NtfyTarget)
-    assert t._url == "https://ntfy.sh/legacy-topic"
-    assert t._headers == {"Authorization": "Bearer tk_1"}
+    assert t._url == "https://ntfy.sh/my-topic"
 
 
-def test_legacy_ntfy_custom_server():
+def test_topic_join_normalizes_slashes():
     t = TargetBuilder.from_env(
-        {"NTFY_TOPIC": "t", "NTFY_SERVER": "https://ntfy.example.com/"}
+        {"TARGET_URL": "https://ntfy.sh/", "TARGET_TOPIC": "/my-topic/"}
     ).build()
-    assert t._url == "https://ntfy.example.com/t"
+    assert t._url == "https://ntfy.sh/my-topic"
+
+
+def test_no_topic_uses_url_as_is():
+    t = TargetBuilder.from_env({"TARGET_URL": "https://ntfy.sh/already/full"}).build()
+    assert t._url == "https://ntfy.sh/already/full"
+
+
+def test_legacy_ntfy_env_no_longer_recognized():
+    # NTFY_* are gone: without TARGET_URL there is nothing to build from.
+    with pytest.raises(ValueError, match="no target URL"):
+        TargetBuilder.from_env({"NTFY_TOPIC": "x", "NTFY_TOKEN": "tk_1"}).build()
 
 
 def test_missing_url_raises():

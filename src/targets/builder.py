@@ -8,12 +8,11 @@ the kind (explicit ``TARGET_TYPE``, else the ``ntfy`` default) and calls its
 factory.
 
 Environment variables (see ``.env.example``):
-    TARGET_URL   full endpoint URL, e.g. https://ntfy.sh/my-topic
+    TARGET_URL   base endpoint URL, e.g. https://ntfy.sh (required)
     TARGET_TYPE  client to use (optional; defaults to "ntfy")
     TARGET_TOKEN bearer token (optional)
-
-Legacy ntfy variables (NTFY_SERVER / NTFY_TOPIC / NTFY_TOKEN) are still honored
-when TARGET_URL is not set, so existing deployments keep working.
+    TARGET_TOPIC path segment appended to TARGET_URL (optional; e.g. an ntfy
+                 topic). When unset, TARGET_URL is used as-is.
 """
 
 from __future__ import annotations
@@ -49,8 +48,9 @@ class TargetBuilder:
         self._url: str | None = None
         self._kind: str | None = None
         self._token: str | None = None
+        self._topic: str | None = None
 
-    def url(self, url: str) -> "TargetBuilder":
+    def url(self, url: str | None) -> "TargetBuilder":
         self._url = url
         return self
 
@@ -62,29 +62,33 @@ class TargetBuilder:
         self._token = token
         return self
 
+    def topic(self, topic: str | None) -> "TargetBuilder":
+        self._topic = topic
+        return self
+
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "TargetBuilder":
         env = os.environ if env is None else env
-        b = cls()
-
-        url = env.get("TARGET_URL")
-        if not url and env.get("NTFY_TOPIC"):
-            # Legacy: reconstruct the ntfy topic URL from the old variables.
-            server = env.get("NTFY_SERVER", "https://ntfy.sh").rstrip("/")
-            url = f"{server}/{env['NTFY_TOPIC']}"
-
-        if url:
-            b.url(url)
-        b.kind(env.get("TARGET_TYPE"))
-        b.token(env.get("TARGET_TOKEN") or env.get("NTFY_TOKEN"))
-        return b
+        return (
+            cls()
+            .url(env.get("TARGET_URL"))
+            .kind(env.get("TARGET_TYPE"))
+            .token(env.get("TARGET_TOKEN"))
+            .topic(env.get("TARGET_TOPIC"))
+        )
 
     def build(self) -> Target:
         if not self._url:
             raise ValueError(
-                "no target URL configured — set TARGET_URL (or the legacy "
-                "NTFY_TOPIC) in the environment"
+                "no target URL configured — set TARGET_URL in the environment"
             )
+        # A topic (e.g. an ntfy topic) is an optional path segment appended to
+        # the base URL. Strip slashes on both sides so a trailing slash on the
+        # base or a leading slash on the topic can't produce a "//".
+        url = self._url
+        if self._topic:
+            url = f"{url.rstrip('/')}/{self._topic.strip('/')}"
+
         kind = self._kind or DEFAULT_KIND
         try:
             factory = _REGISTRY[kind]
@@ -92,4 +96,4 @@ class TargetBuilder:
             raise ValueError(
                 f"unknown target type {kind!r}; registered: {registered_kinds()}"
             ) from None
-        return factory(url=self._url, token=self._token)
+        return factory(url=url, token=self._token)
