@@ -105,6 +105,13 @@ docker compose up -d bot
 docker compose logs -f bot
 ```
 
+If you change the bot's code (`src/`, `Dockerfile`, `requirements*.txt`), rebuild
+the image before restarting so the container picks up the change:
+
+```bash
+docker compose up -d --build bot
+```
+
 ## Usage
 
 Open **Note to Self** in Signal and send any text. It appears at your target
